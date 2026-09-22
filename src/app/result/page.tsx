@@ -21,6 +21,7 @@ import { CrisisSimulationSection } from "@/components/result/CrisisSimulationSec
 import { ChemistrySection } from "@/components/result/ChemistrySection";
 import { PrescriptionSection } from "@/components/result/PrescriptionSection";
 import { StickyActions } from "@/components/result/StickyActions";
+import { DesktopPromo, DesktopWatermark } from "@/components/result/DesktopDecoration";
 import { ScoreBarChart } from "@/components/result/ScoreBarChart";
 import { ScoreBreakdown } from "@/components/result/ScoreBreakdown";
 import { OverallSummary } from "@/components/result/OverallSummary";
@@ -75,7 +76,9 @@ export default function ResultPage() {
 
   return (
     <main className="relative min-h-screen pb-64">
-      <div className="mx-auto w-full max-w-[560px] space-y-9 px-5 pt-4 sm:my-8 sm:rounded-[36px] sm:border sm:border-line sm:bg-cream sm:px-8 sm:pb-12 sm:shadow-[0_24px_64px_-20px_rgba(22,22,29,0.18)]">
+      <DesktopWatermark />
+      <DesktopPromo isShared={isShared} />
+      <div className="mx-auto w-full max-w-[430px] space-y-9 px-5 pt-4">
         <ResultHeader badge={isShared ? "공유된 결과" : "내 결과"} />
         <CharacterHero character={character} />
         <TemperamentMap results={results} simulatedNames={simulatedNames} />

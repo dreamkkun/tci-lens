@@ -118,7 +118,7 @@ export function StickyActions({ answers, character, simulation }: StickyActionsP
           visible ? "translate-y-0" : "translate-y-full"
         }`}
       >
-        <div className="pointer-events-auto mx-auto max-w-[560px] px-5">
+        <div className="pointer-events-auto mx-auto max-w-[430px] px-5">
           {manualUrl && (
             <div className="mb-3 flex items-center gap-2 rounded-2xl border border-line bg-white p-3 shadow-sm">
               <input
