@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, Download, Link2, X } from "lucide-react";
 import { CharacterProfile } from "@/utils/character";
 import { SimulationData } from "@/utils/crisisSimulation";
@@ -21,6 +21,49 @@ export function StickyActions({ answers, character, simulation }: StickyActionsP
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [linkState, setLinkState] = useState<LinkState>("idle");
   const [manualUrl, setManualUrl] = useState<string | null>(null);
+
+  // 아래로 스크롤하는 동안은 버튼 바를 숨겨 본문 마지막 줄을 가리지 않게 하고,
+  // 위로 스크롤하거나 멈추면(또는 맨 위/맨 아래 근처에서는 항상) 다시 보여준다.
+  const [visible, setVisible] = useState(true);
+  useEffect(() => {
+    let lastY = window.scrollY;
+    let ticking = false;
+    let stopTimer: ReturnType<typeof setTimeout>;
+
+    const scheduleRevealOnStop = () => {
+      clearTimeout(stopTimer);
+      stopTimer = setTimeout(() => setVisible(true), 400);
+    };
+
+    const handleScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        const y = window.scrollY;
+        const delta = y - lastY;
+        const nearBottom =
+          window.innerHeight + y >= document.documentElement.scrollHeight - 32;
+
+        if (y < 80 || nearBottom) {
+          setVisible(true);
+        } else if (delta > 6) {
+          setVisible(false);
+        } else if (delta < -6) {
+          setVisible(true);
+        }
+
+        lastY = y;
+        scheduleRevealOnStop();
+        ticking = false;
+      });
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      clearTimeout(stopTimer);
+    };
+  }, []);
 
   const handleSave = async () => {
     if (saveState === "saving") return;
@@ -69,7 +112,12 @@ export function StickyActions({ answers, character, simulation }: StickyActionsP
 
   return (
     <>
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 bg-gradient-to-t from-cream via-cream/95 to-transparent pb-5 pt-10 sm:pb-8">
+      <div
+        aria-hidden={!visible}
+        className={`pointer-events-none fixed inset-x-0 bottom-0 z-40 bg-gradient-to-t from-cream via-cream/95 to-transparent pb-5 pt-10 transition-transform duration-300 ease-out sm:pb-8 ${
+          visible ? "translate-y-0" : "translate-y-full"
+        }`}
+      >
         <div className="pointer-events-auto mx-auto max-w-[560px] px-5">
           {manualUrl && (
             <div className="mb-3 flex items-center gap-2 rounded-2xl border border-line bg-white p-3 shadow-sm">
