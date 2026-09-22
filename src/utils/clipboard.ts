@@ -1,0 +1,26 @@
+function legacyCopy(text: string): boolean {
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  let succeeded = false;
+  try {
+    succeeded = document.execCommand("copy");
+  } catch {
+    succeeded = false;
+  }
+  document.body.removeChild(textarea);
+  return succeeded;
+}
+
+export async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return legacyCopy(text);
+  }
+}
