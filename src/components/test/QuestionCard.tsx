@@ -11,7 +11,9 @@ const SCALE_LABELS = ["전혀 아니다", "아니다", "보통이다", "그렇�
 export function QuestionCard({ question, selectedValue, onSelect }: QuestionCardProps) {
   return (
     <div className="space-y-6">
-      <p className="min-h-[3.5rem] text-xl font-black leading-relaxed text-ink">
+      {/* 문항 길이(1~3줄)에 관계없이 버튼 세로 위치가 항상 같은 자리에 오도록
+          가장 긴 문항 기준(3줄)으로 최소 높이를 고정한다. */}
+      <p className="min-h-[6rem] text-xl font-black leading-relaxed text-ink sm:min-h-[4.5rem]">
         {question.text}
       </p>
 
