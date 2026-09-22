@@ -1,4 +1,4 @@
-import { Angry, Smile, Star } from "lucide-react";
+import { Frown, Smile, Star } from "lucide-react";
 import { SectionTitle } from "@/components/result/SectionTitle";
 import { ChemistryCard } from "@/utils/crisisSimulation";
 
@@ -13,7 +13,7 @@ const TONE = {
     card: "border-coral-line bg-coral-soft",
     badge: "text-coral",
     avatar: "bg-[#FF8A8A]",
-    Icon: Angry,
+    Icon: Frown,
   },
 } as const;
 
