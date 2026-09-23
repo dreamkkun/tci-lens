@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Download, Link2, X } from "lucide-react";
 import { CharacterProfile } from "@/utils/character";
 import { SimulationData } from "@/utils/crisisSimulation";
@@ -14,13 +14,17 @@ interface StickyActionsProps {
   simulation: SimulationData;
 }
 
-type SaveState = "idle" | "saving" | "done" | "failed";
+type SaveState = "idle" | "saving" | "failed";
 type LinkState = "idle" | "copied" | "failed";
 
 export function StickyActions({ answers, character, simulation }: StickyActionsProps) {
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [linkState, setLinkState] = useState<LinkState>("idle");
   const [manualUrl, setManualUrl] = useState<string | null>(null);
+  // 생성된 카드 이미지의 blob URL. `<a download>` 강제 클릭은 카카오톡 등 인앱
+  // 브라우저에서 조용히 실패하는 경우가 많아, 대신 이미지를 화면에 띄워
+  // "길게 눌러 저장"(OS 기본 기능)으로 저장하게 한다.
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   // 아래로 스크롤하는 동안은 버튼 바를 숨겨 본문 마지막 줄을 가리지 않게 하고,
   // 위로 스크롤하거나 멈추면(또는 맨 위/맨 아래 근처에서는 항상) 다시 보여준다.
@@ -65,26 +69,36 @@ export function StickyActions({ answers, character, simulation }: StickyActionsP
     };
   }, []);
 
+  // 언마운트 시 blob URL 정리
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleSave = async () => {
     if (saveState === "saving") return;
     setSaveState("saving");
     try {
       const blob = await renderStoryCard(character, simulation);
-
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = "tci-lens-story.png";
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      setSaveState("done");
+      setPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return URL.createObjectURL(blob);
+      });
+      setSaveState("idle");
     } catch (error) {
-      console.error("[tci-lens] 카드 저장 실패:", error);
+      console.error("[tci-lens] 카드 생성 실패:", error);
       setSaveState("failed");
+      setTimeout(() => setSaveState("idle"), 2500);
     }
-    setTimeout(() => setSaveState("idle"), 2500);
+  };
+
+  const closePreview = () => {
+    setPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
   };
 
   const handleCopyLink = async () => {
@@ -101,10 +115,8 @@ export function StickyActions({ answers, character, simulation }: StickyActionsP
   };
 
   const statusMessage =
-    saveState === "done"
-      ? "카드를 저장했어요"
-      : saveState === "failed"
-      ? "이미지 저장에 실패했어요. 다시 시도해주세요"
+    saveState === "failed"
+      ? "이미지를 만들지 못했어요. 다시 시도해주세요"
       : linkState === "copied"
       ? "결과 링크를 복사했어요"
       : linkState === "failed" && !manualUrl
@@ -113,6 +125,42 @@ export function StickyActions({ answers, character, simulation }: StickyActionsP
 
   return (
     <>
+      {previewUrl && (
+        <div
+          role="dialog"
+          aria-label="카드 이미지 미리보기"
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-black/85 p-5"
+          onClick={closePreview}
+        >
+          <button
+            type="button"
+            onClick={closePreview}
+            aria-label="닫기"
+            className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={previewUrl}
+            alt="TCI-Lens 결과 카드"
+            onClick={(event) => event.stopPropagation()}
+            className="max-h-[70vh] w-auto max-w-full rounded-2xl object-contain shadow-2xl"
+          />
+          <p className="text-center text-sm font-bold text-white">
+            이미지를 길게 눌러 "이미지 저장"을 선택하세요
+          </p>
+          <a
+            href={previewUrl}
+            download="tci-lens-story.png"
+            onClick={(event) => event.stopPropagation()}
+            className="text-xs font-medium text-white/60 underline underline-offset-2"
+          >
+            대신 다운로드하기
+          </a>
+        </div>
+      )}
+
       <div
         aria-hidden={!visible}
         className={`pointer-events-none fixed inset-x-0 bottom-0 z-40 bg-gradient-to-t from-cream via-cream/95 to-transparent pb-5 pt-10 transition-transform duration-300 ease-out sm:pb-8 ${
@@ -156,7 +204,7 @@ export function StickyActions({ answers, character, simulation }: StickyActionsP
               className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full bg-ink text-[15px] font-bold text-white shadow-lg transition-colors hover:bg-black disabled:opacity-70"
             >
               <Download className="h-5 w-5" />
-              {saveState === "saving" ? "카드 저장 중…" : "카드 저장"}
+              {saveState === "saving" ? "카드 만드는 중…" : "카드 저장"}
             </button>
             <button
               type="button"
