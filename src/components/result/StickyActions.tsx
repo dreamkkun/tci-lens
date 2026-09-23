@@ -80,7 +80,8 @@ export function StickyActions({ answers, character, simulation }: StickyActionsP
       document.body.removeChild(anchor);
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       setSaveState("done");
-    } catch {
+    } catch (error) {
+      console.error("[tci-lens] 카드 저장 실패:", error);
       setSaveState("failed");
     }
     setTimeout(() => setSaveState("idle"), 2500);

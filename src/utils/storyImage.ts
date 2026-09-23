@@ -43,6 +43,40 @@ function roundedRect(
   ctx.closePath();
 }
 
+/**
+ * 페이지가 이미 요청해둔 폰트가 로드될 때까지 기다린다. `document.fonts.load()`는
+ * 폰트 shorthand 문자열을 브라우저가 직접 파싱해야 해서(특히 next/font가 생성하는
+ * 긴 폴백 스택과 함께 쓰면) 일부 모바일 브라우저·인앱 브라우저(카카오톡 등)에서
+ * SyntaxError로 죽는 경우가 있었다. 인자가 필요 없는 `fonts.ready`만 쓰고, API 자체가
+ * 없거나 응답이 없어도(최대 1.5초) 카드 생성 자체는 항상 진행되도록 한다.
+ */
+async function waitForFonts(): Promise<void> {
+  try {
+    const fonts = document.fonts;
+    if (fonts?.ready) {
+      await Promise.race([fonts.ready, new Promise((resolve) => setTimeout(resolve, 1500))]);
+    }
+  } catch {
+    // 폰트 API 미지원/실패 — 시스템 폴백 폰트로 계속 그린다.
+  }
+}
+
+/** 일부 브라우저는 canvas.toBlob이 없거나 null을 돌려줄 수 있어 dataURL로 폴백한다. */
+async function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+  if (typeof canvas.toBlob === "function") {
+    const blob = await new Promise<Blob | null>((resolve) => {
+      try {
+        canvas.toBlob((result) => resolve(result), "image/png");
+      } catch {
+        resolve(null);
+      }
+    });
+    if (blob) return blob;
+  }
+  const response = await fetch(canvas.toDataURL("image/png"));
+  return response.blob();
+}
+
 function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
   const lines: string[] = [];
   let current = "";
@@ -75,19 +109,7 @@ export async function renderStoryCard(
   const quote = `“${simulation.loudest.viral}”`;
   const chipTexts = character.chips.map((chip) => `${chip.name} ${chip.scale} ${chip.label}`);
 
-  const allText = [
-    "TCI-Lens 나의 기질 캐릭터 내 머릿속 데시벨 나도 검사해보기 · dB()",
-    character.adjective,
-    character.type,
-    quote,
-    ...chipTexts,
-    ...bars.map((bar) => bar.label),
-  ].join(" ");
-  await Promise.all(
-    ["900 38px", "900 18px", "700 15px", "700 12px"].map((font) =>
-      document.fonts.load(`${font} ${family}`, allText)
-    )
-  );
+  await waitForFonts();
 
   const canvas = document.createElement("canvas");
   canvas.width = WIDTH * SCALE;
@@ -186,7 +208,5 @@ export async function renderStoryCard(
   ctx.textAlign = "center";
   ctx.fillText("TCI-Lens · 나도 검사해보기", WIDTH / 2, 616);
 
-  return new Promise<Blob>((resolve, reject) =>
-    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("image encoding failed"))), "image/png")
-  );
+  return canvasToBlob(canvas);
 }
