@@ -125,7 +125,7 @@ export default function ResultPage() {
         </div>
       </div>
 
-      <StickyActions answers={answers} character={character} simulation={simulation} />
+      <StickyActions answers={answers} character={character} simulation={simulation} results={results} />
     </main>
   );
 }

@@ -1,16 +1,22 @@
-import { TCIScale } from "@/types/assessment";
+import { ScaleResult, TCIScale } from "@/types/assessment";
 import { CharacterProfile } from "@/utils/character";
 import { SimulationData } from "@/utils/crisisSimulation";
+import { buildOverallSummary, OverallSummary } from "@/utils/scoring";
 
-/** 논리 좌표계는 360x640, 실제 출력은 3배(1080x1920, 인스타 스토리 규격)다. */
+/** 논리 좌표계는 폭 360 고정, 실제 출력은 3배(가로 1080px)다. 세로는 종합 평가
+ *  문단 길이에 따라 달라지므로 렌더링 시점에 콘텐츠 높이를 계산해 정한다. */
 const WIDTH = 360;
-const HEIGHT = 640;
 const SCALE = 3;
 const PAD = 32;
+const CONTENT_W = WIDTH - PAD * 2;
 
 const COLORS = {
   cream: "#FBF7F0",
   ink: "#16161D",
+  ink70: "rgba(22,22,29,0.72)",
+  ink50: "rgba(22,22,29,0.5)",
+  ink40: "rgba(22,22,29,0.4)",
+  ink05: "rgba(22,22,29,0.05)",
   coral: "#E5484D",
   line: "#EADFD0",
 };
@@ -100,113 +106,201 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number)
   return lines;
 }
 
-export async function renderStoryCard(
+/**
+ * 카드 전체를 그리고 최종 콘텐츠 높이(y 하단 + 여백)를 반환한다. 실제 저장용
+ * 캔버스를 만들기 전, 크기가 정해지지 않은 스크래치 캔버스에도 그대로 한 번
+ * 돌려서 필요한 높이를 먼저 계산한다(measureText는 캔버스 크기와 무관하다).
+ */
+function paintCard(
+  ctx: CanvasRenderingContext2D,
+  family: string,
   character: CharacterProfile,
+  summary: OverallSummary,
   simulation: SimulationData
-): Promise<Blob> {
-  const family = getComputedStyle(document.body).fontFamily;
+): number {
   const bars = [...simulation.bubbles].sort((a, b) => b.db - a.db);
   const quote = `“${simulation.loudest.viral}”`;
   const chipTexts = character.chips.map((chip) => `${chip.name} ${chip.scale} ${chip.label}`);
 
-  await waitForFonts();
-
-  const canvas = document.createElement("canvas");
-  canvas.width = WIDTH * SCALE;
-  canvas.height = HEIGHT * SCALE;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("canvas is not supported");
-  ctx.scale(SCALE, SCALE);
   ctx.textBaseline = "middle";
-
-  ctx.fillStyle = COLORS.cream;
-  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  let y = PAD;
 
   // 로고
   ctx.strokeStyle = COLORS.coral;
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.arc(PAD + 14, PAD + 14, 13, 0, Math.PI * 2);
+  ctx.arc(PAD + 14, y + 14, 13, 0, Math.PI * 2);
   ctx.stroke();
   ctx.lineWidth = 2.2;
   ctx.lineCap = "round";
   ctx.beginPath();
-  ctx.arc(PAD + 13, PAD + 13, 4.2, 0, Math.PI * 2);
-  ctx.moveTo(PAD + 16.3, PAD + 16.3);
-  ctx.lineTo(PAD + 19.5, PAD + 19.5);
+  ctx.arc(PAD + 13, y + 13, 4.2, 0, Math.PI * 2);
+  ctx.moveTo(PAD + 16.3, y + 16.3);
+  ctx.lineTo(PAD + 19.5, y + 19.5);
   ctx.stroke();
   ctx.fillStyle = COLORS.ink;
   ctx.font = `900 18px ${family}`;
   ctx.textAlign = "left";
-  ctx.fillText("TCI-Lens", PAD + 36, PAD + 14);
+  ctx.fillText("TCI-Lens", PAD + 36, y + 14);
+  y += 28 + 40;
 
   // 캐릭터 이름
   ctx.fillStyle = COLORS.coral;
   ctx.font = `700 12px ${family}`;
-  ctx.fillText("나의 기질 캐릭터", PAD, 122);
+  ctx.fillText("나의 기질 캐릭터", PAD, y);
+  y += 12 + 26;
   ctx.fillStyle = COLORS.ink;
-  ctx.font = `900 38px ${family}`;
-  ctx.fillText(character.adjective, PAD, 160);
-  ctx.fillText(character.type, PAD, 206);
+  ctx.font = `900 34px ${family}`;
+  ctx.fillText(character.adjective, PAD, y);
+  y += 34 + 10;
+  ctx.fillText(character.type, PAD, y);
+  y += 34 + 28;
 
-  // 칩
+  // 기질 칩
   ctx.font = `700 12px ${family}`;
   let chipX = PAD;
-  let chipY = 236;
+  let chipRowY = y;
   character.chips.forEach((chip, index) => {
     const width = ctx.measureText(chipTexts[index]).width + 24;
     if (chipX + width > WIDTH - PAD) {
       chipX = PAD;
-      chipY += 36;
+      chipRowY += 36;
     }
     ctx.fillStyle = CHIP_COLORS[chip.scale].bg;
-    roundedRect(ctx, chipX, chipY, width, 28, 14);
+    roundedRect(ctx, chipX, chipRowY, width, 28, 14);
     ctx.fill();
     ctx.fillStyle = CHIP_COLORS[chip.scale].fg;
-    ctx.fillText(chipTexts[index], chipX + 12, chipY + 14.5);
+    ctx.fillText(chipTexts[index], chipX + 12, chipRowY + 14.5);
     chipX += width + 8;
   });
+  y = chipRowY + 28 + 36;
+
+  // 종합 평가
+  ctx.textAlign = "left";
+  ctx.fillStyle = COLORS.ink;
+  ctx.font = `900 17px ${family}`;
+  ctx.fillText("종합 평가", PAD, y);
+  y += 17 + 26;
+
+  const statW = (CONTENT_W - 12) / 2;
+  const statH = 58;
+  ctx.fillStyle = CHIP_COLORS.HA.bg;
+  roundedRect(ctx, PAD, y, statW, statH, 16);
+  ctx.fill();
+  ctx.fillStyle = COLORS.ink05;
+  roundedRect(ctx, PAD + statW + 12, y, statW, statH, 16);
+  ctx.fill();
+
+  ctx.textAlign = "center";
+  ctx.fillStyle = COLORS.ink50;
+  ctx.font = `700 11px ${family}`;
+  ctx.fillText("기질 영역 평균", PAD + statW / 2, y + 17);
+  ctx.fillText("성격 영역 평균", PAD + statW + 12 + statW / 2, y + 17);
+  ctx.font = `900 20px ${family}`;
+  ctx.fillStyle = COLORS.coral;
+  ctx.fillText(`${summary.temperamentAvg}%`, PAD + statW / 2, y + 39);
+  ctx.fillStyle = COLORS.ink;
+  ctx.fillText(`${summary.characterAvg}%`, PAD + statW + 12 + statW / 2, y + 39);
+  ctx.textAlign = "left";
+  y += statH + 28;
+
+  const sections: { label: string; text: string }[] = [
+    { label: `개요 · ${summary.characterName}`, text: summary.overviewParagraph },
+    { label: "강점과 보완점", text: summary.strengthGrowthParagraph },
+    { label: "종합 코멘트", text: summary.closingParagraph },
+  ];
+  sections.forEach((section) => {
+    ctx.font = `700 11px ${family}`;
+    ctx.fillStyle = COLORS.ink50;
+    ctx.fillText(section.label, PAD, y);
+    y += 11 + 18;
+
+    ctx.font = `500 13px ${family}`;
+    ctx.fillStyle = COLORS.ink70;
+    const lines = wrapText(ctx, section.text, CONTENT_W);
+    lines.forEach((line) => {
+      ctx.fillText(line, PAD, y);
+      y += 20;
+    });
+    y += 18;
+  });
+  y += 6;
 
   // dB 막대
-  const barWidth = WIDTH - PAD * 2;
-  ctx.fillStyle = "rgba(22,22,29,0.5)";
+  ctx.fillStyle = COLORS.ink50;
   ctx.font = `700 12px ${family}`;
-  ctx.fillText("내 머릿속 데시벨", PAD, 372);
-  bars.forEach((bar, index) => {
-    const top = 396 + index * 44;
+  ctx.fillText("내 머릿속 데시벨", PAD, y);
+  y += 12 + 24;
+  bars.forEach((bar) => {
     ctx.fillStyle = COLORS.ink;
     ctx.font = `700 12px ${family}`;
     ctx.textAlign = "left";
-    ctx.fillText(bar.label, PAD, top);
+    ctx.fillText(bar.label, PAD, y);
     ctx.textAlign = "right";
-    ctx.fillText(`${bar.db}dB`, WIDTH - PAD, top);
+    ctx.fillText(`${bar.db}dB`, WIDTH - PAD, y);
     ctx.fillStyle = COLORS.line;
-    roundedRect(ctx, PAD, top + 12, barWidth, 10, 5);
+    roundedRect(ctx, PAD, y + 12, CONTENT_W, 10, 5);
     ctx.fill();
     ctx.fillStyle = COLORS.coral;
-    roundedRect(ctx, PAD, top + 12, Math.max(10, (barWidth * bar.db) / 100), 10, 5);
+    roundedRect(ctx, PAD, y + 12, Math.max(10, (CONTENT_W * bar.db) / 100), 10, 5);
     ctx.fill();
+    y += 44;
   });
+  y += 6;
 
   // 공유 문구 박스
   ctx.textAlign = "left";
   ctx.font = `700 15px ${family}`;
-  const quoteLines = wrapText(ctx, quote, barWidth - 32);
+  const quoteLines = wrapText(ctx, quote, CONTENT_W - 32);
   const boxHeight = 32 + quoteLines.length * 22;
-  const boxTop = 590 - boxHeight;
   ctx.fillStyle = COLORS.ink;
-  roundedRect(ctx, PAD, boxTop, barWidth, boxHeight, 16);
+  roundedRect(ctx, PAD, y, CONTENT_W, boxHeight, 16);
   ctx.fill();
   ctx.fillStyle = "#FFFFFF";
   quoteLines.forEach((line, index) => {
-    ctx.fillText(line, PAD + 16, boxTop + 16 + 11 + index * 22);
+    ctx.fillText(line, PAD + 16, y + 16 + 11 + index * 22);
   });
+  y += boxHeight + 32;
 
   // 푸터
-  ctx.fillStyle = "rgba(22,22,29,0.4)";
+  ctx.fillStyle = COLORS.ink40;
   ctx.font = `700 12px ${family}`;
   ctx.textAlign = "center";
-  ctx.fillText("TCI-Lens · 나도 검사해보기", WIDTH / 2, 616);
+  ctx.fillText("TCI-Lens · 나도 검사해보기", WIDTH / 2, y);
+  y += 12;
+
+  return y + PAD;
+}
+
+export async function renderStoryCard(
+  character: CharacterProfile,
+  simulation: SimulationData,
+  results: Record<TCIScale, ScaleResult>
+): Promise<Blob> {
+  const family = getComputedStyle(document.body).fontFamily;
+  const summary = buildOverallSummary(results);
+
+  await waitForFonts();
+
+  // 1차: 그려지지 않는 스크래치 캔버스로 전체 콘텐츠 높이를 계산한다
+  // (measureText는 캔버스 크기와 무관하게 동작한다).
+  const scratch = document.createElement("canvas");
+  const scratchCtx = scratch.getContext("2d");
+  if (!scratchCtx) throw new Error("canvas is not supported");
+  const contentHeight = paintCard(scratchCtx, family, character, summary, simulation);
+
+  // 2차: 계산된 높이로 실제 캔버스를 만들어 그린다.
+  const canvas = document.createElement("canvas");
+  canvas.width = WIDTH * SCALE;
+  canvas.height = contentHeight * SCALE;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("canvas is not supported");
+  ctx.scale(SCALE, SCALE);
+
+  ctx.fillStyle = COLORS.cream;
+  ctx.fillRect(0, 0, WIDTH, contentHeight);
+
+  paintCard(ctx, family, character, summary, simulation);
 
   return canvasToBlob(canvas);
 }

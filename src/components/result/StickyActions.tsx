@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Check, Download, Link2, X } from "lucide-react";
+import { TCIScale } from "@/types/assessment";
+import type { ScaleResult } from "@/types/assessment";
 import { CharacterProfile } from "@/utils/character";
 import { SimulationData } from "@/utils/crisisSimulation";
 import { copyText } from "@/utils/clipboard";
@@ -12,12 +14,13 @@ interface StickyActionsProps {
   answers: Record<number, number>;
   character: CharacterProfile;
   simulation: SimulationData;
+  results: Record<TCIScale, ScaleResult>;
 }
 
 type SaveState = "idle" | "saving" | "failed";
 type LinkState = "idle" | "copied" | "failed";
 
-export function StickyActions({ answers, character, simulation }: StickyActionsProps) {
+export function StickyActions({ answers, character, simulation, results }: StickyActionsProps) {
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [linkState, setLinkState] = useState<LinkState>("idle");
   const [manualUrl, setManualUrl] = useState<string | null>(null);
@@ -81,7 +84,7 @@ export function StickyActions({ answers, character, simulation }: StickyActionsP
     if (saveState === "saving") return;
     setSaveState("saving");
     try {
-      const blob = await renderStoryCard(character, simulation);
+      const blob = await renderStoryCard(character, simulation, results);
       setPreviewUrl((prev) => {
         if (prev) URL.revokeObjectURL(prev);
         return URL.createObjectURL(blob);
