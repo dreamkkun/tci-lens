@@ -122,7 +122,7 @@ export function CrisisSimulationSection({
         </div>
       </Card>
 
-      <div className="flex items-center gap-3 rounded-2xl border border-honey-line bg-honey-soft p-4">
+      <div className="flex items-center gap-3 rounded-2xl border-2 border-honey-line bg-honey-soft p-4 shadow-sm">
         <svg viewBox="0 0 24 24" className="h-9 w-9 shrink-0" aria-hidden>
           <rect x="3" y="12" width="4.5" height="9" rx="1.2" fill="#E5484D" />
           <rect x="9.75" y="4" width="4.5" height="17" rx="1.2" fill="#E5484D" />

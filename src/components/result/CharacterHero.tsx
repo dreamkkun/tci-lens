@@ -1,14 +1,16 @@
 import { TCIScale } from "@/types/assessment";
 import { CharacterProfile } from "@/utils/character";
 
+// 크림색 페이지 배경 위에 바로 놓이는 칩이라, 옅은 배경색만으로는 배경과 잘
+// 구분되지 않는다. 톤별 line 컬러로 테두리를 둘러 경계를 뚜렷하게 만든다.
 const CHIP_TONE: Record<TCIScale, string> = {
-  NS: "bg-peach-soft text-[#9A4A05]",
-  HA: "bg-coral-soft text-[#B4232A]",
-  RD: "bg-honey-soft text-honey-ink",
-  PS: "bg-[#DFF0FF] text-[#1D5FA8]",
-  SD: "bg-coral-soft text-[#B4232A]",
-  CO: "bg-mint-soft text-mint-ink",
-  ST: "bg-[#ECE6FF] text-[#5B3FB3]",
+  NS: "border border-peach-line bg-peach-soft text-[#9A4A05]",
+  HA: "border border-coral-line bg-coral-soft text-[#B4232A]",
+  RD: "border border-honey-line bg-honey-soft text-honey-ink",
+  PS: "border border-[#A9CDF5] bg-[#DFF0FF] text-[#1D5FA8]",
+  SD: "border border-coral-line bg-coral-soft text-[#B4232A]",
+  CO: "border border-mint-line bg-mint-soft text-mint-ink",
+  ST: "border border-[#C7B8F0] bg-[#ECE6FF] text-[#5B3FB3]",
 };
 
 interface CharacterHeroProps {

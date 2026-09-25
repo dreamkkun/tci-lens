@@ -22,7 +22,7 @@ function MatchCard({ card }: { card: ChemistryCard }) {
   const Icon = tone.Icon;
 
   return (
-    <article className={`rounded-3xl border p-5 ${tone.card}`}>
+    <article className={`rounded-3xl border-2 p-5 shadow-sm ${tone.card}`}>
       <div className="flex items-center gap-3.5">
         <span
           className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${tone.avatar}`}
